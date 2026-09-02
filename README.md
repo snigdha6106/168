@@ -1,45 +1,67 @@
-# Intelligent Dead Reckoning (IDR) System with GNSS Fusion
+# AI-Enhanced GNSS/INS Sensor Fusion & Dead Reckoning System
 
-This project is a complete end-to-end working prototype for an AI-enhanced Dead Reckoning and Sensor Fusion system, designed to handle GNSS (GPS) blackouts in environments like tunnels, urban canyons, or dense forests.
+An end-to-end, production-grade navigation prototype designed to maintain high-accuracy vehicle positioning during **GNSS (GPS) blackouts** (e.g., long tunnels, urban canyons, dense canopies).
 
-It consists of a Python-based **Edge Software Engine** that runs advanced Deep Learning and Sensor Fusion algorithms, and a **React Native Mobile Application** that provides a real-time navigation interface.
-
-## System Architecture
-
-The prototype is divided into two main components:
-
-1. **`backend/` (Edge Software Engine)**
-   * **Dataset Generator**: Simulates a vehicle's trajectory, generating noisy IMU data (accelerometer/gyroscope) and simulated GNSS dropouts, mimicking the IO-VNBD dataset structure.
-   * **AI Speed & Vibration Filter**: A PyTorch GRU Neural Network that filters out IMU noise and predicts the vehicle's forward velocity.
-   * **GNSS+INS Sensor Fusion**: An Extended Kalman Filter (EKF) that fuses GNSS data with the AI-predicted IMU odometry. It includes a simulated Map-Matching Non-Holonomic Constraint (NHC) to prevent heading drift.
-   * **Simulation Server**: A FastAPI WebSocket server that streams live telemetry.
-
-2. **`frontend/` (Real-time Navigation Interface)**
-   * Built with React Native (Expo).
-   * Features a live interactive map (`react-leaflet` for web fallback, `react-native-maps` for native).
-   * Displays real-time velocity and active tracking mode (GNSS vs AI Dead Reckoning).
+The system pairs an **Edge AI & Sensor Fusion Backend** (PyTorch + Extended Kalman Filter + OpenStreetMap Map-Matching) with an interactive **React Native / Leaflet Navigation Frontend** via real-time WebSockets (<100ms streaming).
 
 ---
 
-## Installation & Setup
+## 🚀 Key Features & Highlights
 
-### Prerequisites
-* Python 3.9+
-* Node.js & npm
-* Expo CLI
+* **Authentic Deep Learning Speed Estimator:** A PyTorch GRU network trained on micro-vibrations & IMU dynamics from the **IO-VNBD dataset** (`S-S2.csv`) to predict longitudinal velocity without data leakage or overfitting on test routes (`S-S1.csv`).
+* **3D Gravity Vector Decoupling:** Uses the device's 3-axis gravity vector to project raw gyroscope rates onto the true vertical axis, ensuring orientation-independent yaw tracking regardless of smartphone mounting angle.
+* **Extended Kalman Filter (EKF):** Fuses forward speed predictions, integrated gyroscope yaw, and GNSS observations with dynamic covariance adaptation during satellite outages.
+* **Real OpenStreetMap (OSM) Spatial Indexing:** Uses Shapely's `STRtree` R-Tree spatial indexing loaded with **2,065+ real OpenStreetMap road vector segments** (Coventry, UK). Performs non-holonomic projection and bidirectional road tangent alignment without heading flips.
+* **Real-Time Dual-Trajectory Visualization:** Frontend shows both the **Ground Truth GNSS trajectory (Green)** and the **AI Dead Reckoning fused trajectory (Blue)** side-by-side with live status indicators.
 
-### 1. Setup the Backend (Edge Engine)
-Navigate to the backend directory, create a virtual environment, and install the dependencies:
+---
+
+## 🏗️ System Architecture
+
+```
+[ Smartphone 6-DOF IMU ] ──> [ 3D Gravity Vector Alignment ] ──> [ PyTorch GRU Speed Model ] ──┐
+                                       │                                                      │
+                                       ▼                                                      ▼
+[ GNSS Receiver (Satellites) ] ───────────────────────────────> [ Extended Kalman Filter (EKF) ]
+                                                                             ▲
+[ OpenStreetMap R-Tree DB ] ──> [ Non-Holonomic Tangent Snap ] ──────────────┘
+                                                                             │
+                                                                             ▼
+[ React Native / Leaflet UI ] <─── [ FastAPI WebSocket Stream (<100ms) ] <────┘
+```
+
+---
+
+## 📋 Prerequisites
+
+* **Python:** Version `3.10` or higher
+* **Node.js:** Version `18.x` or higher & `npm`
+* **Expo CLI:** Installed via `npm` or run via `npx`
+
+---
+
+## ⚙️ Installation & Setup
+
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd SIH26
+```
+
+### 2. Backend Setup
+Navigate into the `backend/` folder, create a virtual environment, and install dependencies:
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
-pip install fastapi uvicorn websockets pandas numpy torch filterpy
+
+# Install required Python packages
+pip install fastapi uvicorn websockets pandas numpy torch filterpy shapely
 ```
 
-### 2. Setup the Frontend (Mobile App)
-Navigate to the frontend directory and install the Node modules:
+### 3. Frontend Setup
+Open a new terminal window, navigate into the `frontend/` folder, and install npm packages:
 
 ```bash
 cd frontend
@@ -48,32 +70,72 @@ npm install
 
 ---
 
-## How to Run the Prototype
+## ▶️ Running the Application
 
-To see the live simulation, you must run both the backend and frontend simultaneously in separate terminal windows.
+To run the live simulation, start both the **Backend** and **Frontend** concurrently in separate terminals.
 
-### Start the Backend
+### Terminal 1: Start Backend Engine
 ```bash
 cd backend
 source venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-*Note: On first startup, the backend will automatically generate the synthetic dataset and train the PyTorch AI model. This may take a few seconds.*
+> **Note:** The backend automatically loads the pre-cached `data/osm_roads.json` (2,065 OSM segments) and pre-trained weights (`model_weights.pth`).
 
-### Start the Frontend
-Open a new terminal window:
+### Terminal 2: Start Frontend UI (Web Browser)
 ```bash
 cd frontend
 npx expo start --web
 ```
-* This will open the real-time dashboard in your web browser. 
-* To view the app on a physical mobile device, simply run `npx expo start`, download the **Expo Go** app on your phone, and scan the QR code. *(Ensure `WS_URL` in `App.js` is set to your computer's local IP address).*
+* The live navigation dashboard will open automatically in your browser at `http://localhost:8081`.
+* **Testing on a Physical Smartphone (Expo Go):**
+  1. Run `npx expo start`.
+  2. Open `frontend/App.js` and update `WS_URL` to point to your computer's local Wi-Fi IP address (e.g., `ws://192.168.1.50:8000/ws`).
+  3. Scan the QR code using the **Expo Go** app on Android or the Camera app on iOS.
 
 ---
 
-## Demonstration Highlights
+## 🔬 How the Live Demonstration Works
 
-When you run the application, you will observe a vehicle navigating a route:
-1. **Green Mode (GNSS+INS Fusion)**: The system relies on satellites. The AI's estimated path (blue line) perfectly overlays the ground truth (green line).
-2. **Red Mode (AI Dead Reckoning)**: A tunnel is simulated, and GNSS drops out completely. The system instantly falls back to the PyTorch AI model analyzing simulated smartphone vibrations. The blue line continues to accurately track the route without GPS!
-3. **Seamless Transition**: When the vehicle exits the "tunnel", GNSS is restored. Notice that because the AI model is highly accurate, there is almost zero jump or skipping when the signal reconnects.
+When you observe the vehicle moving on the map:
+
+1. **🟢 Green Mode (GNSS Active - High Accuracy):**
+   * The GNSS receiver is active.
+   * EKF continuously updates its position states with satellite fixes.
+   * The AI trajectory (Blue line) directly overlaps the Ground Truth (Green line).
+
+2. **🔴 Red Mode (GNSS Blackout - AI Dead Reckoning Active):**
+   * A tunnel or severe signal loss is simulated for 30% of the route.
+   * GNSS is cut off completely (`gnss_status = 0`).
+   * The EKF automatically relies on:
+     * **PyTorch GRU Inference:** Predicts forward speed from IMU vibration signatures.
+     * **Gravity-Aligned Gyroscope Integration:** Calculates yaw rate free of tilt error.
+     * **OSM Map Constraints:** Snaps position to real road geometry using R-Tree spatial indexing.
+   * The vehicle continues tracking the route smoothly through the outage.
+
+3. **🔄 Seamless GNSS Recovery:**
+   * When satellite reception returns, EKF smoothly re-converges with zero jumping or glitching.
+
+---
+
+## 📁 Repository Structure
+
+```
+SIH26/
+├── README.md                          # Project documentation & instructions
+├── backend/                           # Edge AI & Sensor Fusion Engine
+│   ├── main.py                        # FastAPI WebSocket telemetry server
+│   ├── sensor_fusion.py               # EKF + 3D Gravity Alignment + OSM Map-Matching
+│   ├── ai_model.py                    # PyTorch GRU Neural Network architecture
+│   ├── parse_iovnbd.py                # Dataset parsing & preprocessing script
+│   ├── model_weights.pth              # Pre-trained GRU model weights
+│   └── data/
+│       ├── osm_roads.json             # 2,065 OpenStreetMap road segments (Coventry, UK)
+│       ├── real_route_processed.csv   # S-S1 Test Route (with simulated tunnel)
+│       └── train_route_processed.csv  # S-S2 Training Route (zero leakage)
+└── frontend/                          # Mobile / Web Telemetry Dashboard
+    ├── App.js                         # Main dashboard & telemetry handler
+    ├── WebMap.js                      # Leaflet interactive map component
+    ├── package.json                   # Node dependencies & Expo configuration
+    └── assets/                        # Icons and application branding
+```
