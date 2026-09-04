@@ -2,32 +2,45 @@
 
 An end-to-end, production-grade navigation prototype designed to maintain high-accuracy vehicle positioning during **GNSS (GPS) blackouts** (e.g., long tunnels, urban canyons, dense canopies).
 
-The system pairs an **Edge AI & Sensor Fusion Backend** (PyTorch + Extended Kalman Filter + OpenStreetMap Map-Matching) with an interactive **React Native / Leaflet Navigation Frontend** via real-time WebSockets (<100ms streaming).
+The system pairs an **Edge AI & Sensor Fusion Backend** (PyTorch + Extended Kalman Filter + HMM Map-Matching) with an interactive **React Native / Leaflet Navigation Frontend** via real-time WebSockets (<100ms streaming).
 
 ---
 
-## 🚀 Key Features & Highlights
+## 🚀 Key Features & Mathematical Highlights
 
-* **Authentic Deep Learning Speed Estimator:** A PyTorch GRU network trained on micro-vibrations & IMU dynamics from the **IO-VNBD dataset** (`S-S2.csv`) to predict longitudinal velocity without data leakage or overfitting on test routes (`S-S1.csv`).
-* **3D Gravity Vector Decoupling:** Uses the device's 3-axis gravity vector to project raw gyroscope rates onto the true vertical axis, ensuring orientation-independent yaw tracking regardless of smartphone mounting angle.
-* **Extended Kalman Filter (EKF):** Fuses forward speed predictions, integrated gyroscope yaw, and GNSS observations with dynamic covariance adaptation during satellite outages.
-* **Real OpenStreetMap (OSM) Spatial Indexing:** Uses Shapely's `STRtree` R-Tree spatial indexing loaded with **2,065+ real OpenStreetMap road vector segments** (Coventry, UK). Performs non-holonomic projection and bidirectional road tangent alignment without heading flips.
-* **Real-Time Dual-Trajectory Visualization:** Frontend shows both the **Ground Truth GNSS trajectory (Green)** and the **AI Dead Reckoning fused trajectory (Blue)** side-by-side with live status indicators.
+* **Authentic Deep Learning Speed Estimator:** A PyTorch GRU network trained on micro-vibrations & IMU dynamics from the **IO-VNBD dataset** to predict longitudinal velocity independent of satellite coverage.
+* **Dynamic In-Vehicle Attitude Alignment:** Constructs a continuous 3D Direction Cosine Matrix (DCM) utilizing dynamic pitch, roll, and yaw misalignment. Automatically transforms the raw smartphone IMU feed to match the vehicle chassis regardless of arbitrary dashboard mounting angles.
+* **Extended Kalman Filter (EKF) with NHC & ZUPT:** 
+  * Fuses forward speed predictions and gravity-aligned gyroscope yaw.
+  * **Non-Holonomic Constraints (NHC):** 1D mathematical constraint zeros out lateral sliding drift.
+  * **Zero Velocity Updates (ZUPT):** Multi-factor variance gate completely halts drift when the engine is idling.
+  * **Chi-Square Innovation Gating:** Statistically filters out severe multipath GNSS errors on re-acquisition.
+* **HMM Viterbi Map-Matching:** Replaces naive geometric snapping with a **Hidden Markov Model**. Uses dynamic programming to compute transition penalties based on network connectivity and physical inertia, naturally locking the EKF heading to real-world topological curves using 2,065+ embedded OpenStreetMap vectors.
+* **Real-Time Dual-Trajectory Visualization:** Frontend natively shows both the **Ground Truth GNSS trajectory (Green)** and the **AI Dead Reckoning fused trajectory (Blue)** side-by-side with live WebSocket telemetry metrics.
+
+---
+
+## 🏆 SIH Benchmark Performance
+
+Evaluated over a **native 530-meter continuous GNSS blackout**:
+* **Peak Positional Drift Metric:** 6.65%
+* **Final Outage Drift Metric:** **5.89%** (Strictly passes the Smart India Hackathon <10% constraint)
+* See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for full analytics, offline evaluation methodology, and performance plots.
 
 ---
 
 ## 🏗️ System Architecture
 
 ```
-[ Smartphone 6-DOF IMU ] ──> [ 3D Gravity Vector Alignment ] ──> [ PyTorch GRU Speed Model ] ──┐
-                                       │                                                      │
-                                       ▼                                                      ▼
-[ GNSS Receiver (Satellites) ] ───────────────────────────────> [ Extended Kalman Filter (EKF) ]
+[ Smartphone 6-DOF IMU ] ──> [ 3D Attitude Alignment (DCM) ] ──> [ PyTorch GRU Speed Model ] ──┐
+                                       │                                                       │
+                                       ▼                                                       ▼
+[ GNSS Receiver (Satellites) ] ─────────────────────────> [ Extended Kalman Filter (EKF & NHC) ]
                                                                              ▲
-[ OpenStreetMap R-Tree DB ] ──> [ Non-Holonomic Tangent Snap ] ──────────────┘
+[ OpenStreetMap R-Tree DB ] ──> [ Viterbi HMM Decoder ] ─────────────────────┘
                                                                              │
                                                                              ▼
-[ React Native / Leaflet UI ] <─── [ FastAPI WebSocket Stream (<100ms) ] <────┘
+[ React Native / Leaflet UI ] <─── [ FastAPI WebSocket Stream (<100ms) ] <───┘
 ```
 
 ---
@@ -80,7 +93,6 @@ cd backend
 source venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
-> **Note:** The backend automatically loads the pre-cached `data/osm_roads.json` (2,065 OSM segments) and pre-trained weights (`model_weights.pth`).
 
 ### Terminal 2: Start Frontend UI (Web Browser)
 ```bash
@@ -105,37 +117,13 @@ When you observe the vehicle moving on the map:
    * The AI trajectory (Blue line) directly overlaps the Ground Truth (Green line).
 
 2. **🔴 Red Mode (GNSS Blackout - AI Dead Reckoning Active):**
-   * A tunnel or severe signal loss is simulated for 30% of the route.
+   * A severe 500m tunnel signal loss is natively simulated.
    * GNSS is cut off completely (`gnss_status = 0`).
    * The EKF automatically relies on:
      * **PyTorch GRU Inference:** Predicts forward speed from IMU vibration signatures.
-     * **Gravity-Aligned Gyroscope Integration:** Calculates yaw rate free of tilt error.
-     * **OSM Map Constraints:** Snaps position to real road geometry using R-Tree spatial indexing.
+     * **Dynamic DCM Integration:** Calculates yaw rate physically free of mounting tilt errors.
+     * **HMM Map Constraints:** Viterbi dynamic programming aligns the EKF steering topology directly to OpenStreetMap network curves.
    * The vehicle continues tracking the route smoothly through the outage.
 
 3. **🔄 Seamless GNSS Recovery:**
-   * When satellite reception returns, EKF smoothly re-converges with zero jumping or glitching.
-
----
-
-## 📁 Repository Structure
-
-```
-SIH26/
-├── README.md                          # Project documentation & instructions
-├── backend/                           # Edge AI & Sensor Fusion Engine
-│   ├── main.py                        # FastAPI WebSocket telemetry server
-│   ├── sensor_fusion.py               # EKF + 3D Gravity Alignment + OSM Map-Matching
-│   ├── ai_model.py                    # PyTorch GRU Neural Network architecture
-│   ├── parse_iovnbd.py                # Dataset parsing & preprocessing script
-│   ├── model_weights.pth              # Pre-trained GRU model weights
-│   └── data/
-│       ├── osm_roads.json             # 2,065 OpenStreetMap road segments (Coventry, UK)
-│       ├── real_route_processed.csv   # S-S1 Test Route (with simulated tunnel)
-│       └── train_route_processed.csv  # S-S2 Training Route (zero leakage)
-└── frontend/                          # Mobile / Web Telemetry Dashboard
-    ├── App.js                         # Main dashboard & telemetry handler
-    ├── WebMap.js                      # Leaflet interactive map component
-    ├── package.json                   # Node dependencies & Expo configuration
-    └── assets/                        # Icons and application branding
-```
+   * When satellite reception returns, the Chi-Square Innovation Gater safely locks back onto the true coordinates with minimal glitching.
