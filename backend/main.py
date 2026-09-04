@@ -136,6 +136,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     "measured": {
                         "lat": clean(row['gnss_lat']) if gnss_active else None,
                         "lon": clean(row['gnss_lon']) if gnss_active else None,
+                        "imu": [
+                            clean(row['acc_x']), clean(row['acc_y']), clean(row['acc_z']),
+                            clean(row['gyro_x']), clean(row['gyro_y']), clean(row['gyro_z'])
+                        ]
                     },
                     "estimated": {
                         "lat": clean(fusion_lat),

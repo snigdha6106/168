@@ -1,6 +1,8 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Dimensions, SafeAreaView, Platform } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
+import { AILocalEngine } from './ai_inference';
+import { Switch } from 'react-native';
 
 let MapView, Marker, Polyline, WebMap;
 if (Platform.OS !== 'web') {
@@ -20,9 +22,15 @@ export default function App() {
   const [path, setPath] = useState([]);
   const [truthPath, setTruthPath] = useState([]);
   const [connected, setConnected] = useState(false);
+  const [inferenceMode, setInferenceMode] = useState('cloud');
+  const modeRef = useRef('cloud');
+  const aiEngine = useRef(null);
   const mapRef = useRef(null);
 
   useEffect(() => {
+    if (!aiEngine.current) {
+      aiEngine.current = new AILocalEngine();
+    }
     let ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
@@ -33,6 +41,14 @@ export default function App() {
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
+        
+        // On-Device Edge Inference Override
+        if (modeRef.current === 'device' && data.measured.imu) {
+            const localSpeed = aiEngine.current.predict(data.measured.imu);
+            data.estimated.velocity = localSpeed;
+            data.estimated.mode = "On-Device Local Inference";
+        }
+        
         setTelemetry(data);
         
         // Update paths
@@ -71,7 +87,21 @@ export default function App() {
       {/* Top Dashboard */}
       <View style={[styles.dashboard, telemetry && !telemetry.gnss_active ? styles.dashboardAlert : null]}>
         <Text style={styles.title}>Intelligent Dead Reckoning</Text>
+        
         <Text style={styles.statusText}>Connection: {connected ? '🟢 ONLINE' : '🔴 OFFLINE'}</Text>
+        
+        <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 10}}>
+          <Text style={{color: 'white', marginRight: 10, fontWeight: 'bold'}}>
+             {inferenceMode === 'device' ? '🧠 On-Device Edge AI' : '☁️ Cloud / Server AI'}
+          </Text>
+          <Switch 
+            value={inferenceMode === 'device'} 
+            onValueChange={(val) => { const newMode = val ? 'device' : 'cloud'; setInferenceMode(newMode); modeRef.current = newMode; }}
+            trackColor={{ false: "#767577", true: "#81b0ff" }}
+            thumbColor={inferenceMode === 'device' ? "#2196F3" : "#f4f3f4"}
+          />
+        </View>
+
         
         {telemetry && (
           <View style={styles.telemetryGrid}>
