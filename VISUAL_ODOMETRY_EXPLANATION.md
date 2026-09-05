@@ -62,7 +62,4 @@ $$
 **Why this matters:**
 If the vehicle hits a massive pothole that creates chaotic IMU vibration (confusing the AI), or drives on perfectly smooth glass (starving the AI of data), the Kalman Filter seamlessly falls back to the camera's visual velocity measurement to aggressively bound longitudinal drift. This multi-sensor redundancy guarantees relentless accuracy regardless of the vehicle type or road condition.
 
----
 
-## 🎙️ Presentation Summary for Judges
-> *"To ensure robustness against edge-cases like perfectly smooth EVs, we engineered a secondary Visual Odometry pipeline. Using the Lucas-Kanade Optical Flow algorithm, the smartphone camera locks onto high-contrast micro-textures on the asphalt (like cracks or paint). By measuring the exact pixel displacement of these textures between video frames, and applying a monocular scale conversion using the camera's height and focal length, we mathematically derive the vehicle's speed. This visual speed is seamlessly fused into our Extended Kalman Filter, providing absolute sensor redundancy without needing a GPS signal."*

@@ -28,13 +28,21 @@ It also ships with a **Zero-Dependency On-Device Edge Inference Engine** built d
 
 ---
 
+
 ## 🏆 SIH Benchmark Performance
 
 Evaluated over a **native 530-meter continuous GNSS blackout**:
 * **Peak Positional Drift Metric:** 6.65%
-* **Final Outage Drift Metric:** **5.89%** (Strictly passes the Smart India Hackathon <10% constraint)
-* See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for full analytics, offline evaluation methodology, and performance plots.
+* **Final Outage Drift Metric:** **5.14%** (Strictly passes the Smart India Hackathon <10% constraint)
 
+### Component Accuracy Achieved
+To prove the rigorous mathematical contribution of our components, we measured their specific impacts during the 530m outage:
+* **IMU / AI Data Accuracy:** Unassisted dead-reckoning (Raw IMU) results in a catastrophic **250.09%** drift due to $O(t^2)$ exponential integration error. By injecting our LSTM AI velocity predictions, applying Dynamic Attitude Alignment, and enforcing Non-Holonomic Constraints (NHC) in the EKF, the pure inertial drift is dramatically bounded to **80.33%**.
+* **Map-Matching Accuracy:** While the AI accurately tracks forward distance, minor gyroscope noise causes lateral drift. By applying spatial indexing (STRtree) and topological transition constraints via a Hidden Markov Model (HMM), the map-matcher perfectly binds the vehicle to the road geometry. This topological correction truncates the remaining 80.33% error down to the final pinpoint accuracy of **5.14%**.
+
+*See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) and [`SYSTEM_ACCURACY_ANALYSIS.md`](SYSTEM_ACCURACY_ANALYSIS.md) for full analytics, offline evaluation methodology, and performance plots.*
+
+---
 ---
 
 ## 🏗️ System Architecture
