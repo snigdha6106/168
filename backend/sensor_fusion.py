@@ -200,6 +200,31 @@ class GNSS_INS_Fusion:
         
         return self.ekf.x[0], self.ekf.x[1]
 
+
+    def update_visual_odometry(self, v_cam, noise_variance=0.5):
+        """
+        Fuses Monocular Visual Odometry (Camera) velocity into the EKF.
+        Acts as an absolute forward speed measurement to constrain longitudinal drift
+        when AI predictions are noisy (e.g. extremely bumpy roads).
+        """
+        if v_cam is None or np.isnan(v_cam):
+            return
+            
+        # H matrix for 1D velocity measurement: [lat, lon, v, theta]
+        H_vio = np.array([[0.0, 0.0, 1.0, 0.0]])
+        R_vio = np.array([[noise_variance]])
+        
+        # Standard Kalman Update step
+        z = np.array([v_cam])
+        y = z - np.dot(H_vio, self.ekf.x)
+        
+        S = np.dot(H_vio, np.dot(self.ekf.P, H_vio.T)) + R_vio
+        K = np.dot(self.ekf.P, np.dot(H_vio.T, np.linalg.inv(S)))
+        
+        self.ekf.x = self.ekf.x + np.dot(K, y)
+        I = np.eye(self.ekf.dim_x)
+        self.ekf.P = np.dot(I - np.dot(K, H_vio), self.ekf.P)
+
     def map_matching(self):
         if not self.spatial_index:
             return self.ekf.x[0], self.ekf.x[1]
