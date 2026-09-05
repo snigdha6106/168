@@ -16,7 +16,7 @@ if (Platform.OS !== 'web') {
   WebMap = require('./WebMap').default;
 }
 
-const WS_URL = 'ws://192.168.29.65:8000/ws/telemetry';
+const WS_URL = 'ws://172.31.99.173:8000/ws/telemetry';
 
 export default function App() {
   const [telemetry, setTelemetry] = useState(null);
