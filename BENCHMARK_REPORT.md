@@ -37,9 +37,9 @@ Running Offline Evaluation Pipeline (2000 frames)...
          OFFLINE EVALUATION BENCHMARKS            
 ==================================================
 Total Distance Traveled in Outage: 530.30 m
-Final Positional Error at Exit:    31.21 m
-Peak Drift Metric Detected:        6.65 %
-Final Official SIH Drift Metric:   5.14 % (Primary native benchmark)
+Final Positional Error at Exit:    27.07 m
+Peak Drift Metric Detected:        8.97 %
+Final Official SIH Drift Metric:   5.10 %
 --------------------------------------------------
 ✅ PASS: Drift is strictly below the 10% SIH benchmark limit!
 ==================================================

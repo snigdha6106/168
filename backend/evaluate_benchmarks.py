@@ -187,9 +187,36 @@ def evaluate_benchmarks():
         blackout_distances = np.array(distances)[bo_idx]
         blackout_drifts = np.array(drift_percentages)[bo_idx]
         
+        
         plt.plot(blackout_distances, blackout_drifts, 'b-', label='Proposed System Drift %', linewidth=2)
         plt.axhline(y=10.0, color='r', linestyle='--', label='10% SIH Benchmark Limit', linewidth=2)
         
+        # Add Annotations to explicitly show the values
+        final_dist = blackout_distances[-1]
+        final_drift = blackout_drifts[-1]
+        peak_drift = np.max(blackout_drifts)
+        peak_idx = np.argmax(blackout_drifts)
+        peak_dist = blackout_distances[peak_idx]
+        
+        plt.scatter([final_dist], [final_drift], color='blue', s=50, zorder=5)
+        plt.annotate(f"Final Drift: {final_drift:.2f}%", 
+                     (final_dist, final_drift), 
+                     textcoords="offset points", 
+                     xytext=(-40, 15), 
+                     ha='center', 
+                     fontsize=10, 
+                     fontweight='bold', 
+                     color='blue')
+                     
+        plt.scatter([peak_dist], [peak_drift], color='purple', s=50, zorder=5)
+        plt.annotate(f"Peak Drift: {peak_drift:.2f}%", 
+                     (peak_dist, peak_drift), 
+                     textcoords="offset points", 
+                     xytext=(0, 15), 
+                     ha='center', 
+                     fontsize=10, 
+                     fontweight='bold', 
+                     color='purple')
         plt.ylim(0, max(12, np.max(blackout_drifts) * 1.2))
         plt.title("Cumulative Positional Drift Error % Over Outage Distance")
         plt.xlabel("Distance Traveled in GNSS Outage (meters)")
